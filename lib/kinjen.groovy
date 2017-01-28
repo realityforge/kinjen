@@ -13,7 +13,7 @@ static extract_auto_merge_target( script )
   }
   else
   {
-    return null;
+    return null
   }
 }
 
@@ -393,4 +393,4 @@ static send_notifications( script )
   }
 }
 
-return this;
+return this
