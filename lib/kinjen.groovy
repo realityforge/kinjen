@@ -259,7 +259,7 @@ static guard_build( script, Map options = [:], actions )
  */
 static run_in_container( script, image_name, actions )
 {
-  name = "${script.env.JOB_NAME.replaceAll( /[\\\\/-]/, '_' ).replaceAll( '%2F', '_' )}_${script.env.BUILD_NUMBER}"
+  def name = "${script.env.JOB_NAME.replaceAll( /[\\\\/-]/, '_' ).replaceAll( '%2F', '_' )}_${script.env.BUILD_NUMBER}"
   script.docker.image( image_name ).inside( "--name '${name}'", actions )
 }
 
