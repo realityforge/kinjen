@@ -263,14 +263,19 @@ static run_in_container( script, image_name, actions )
   script.docker.image( image_name ).inside( "--name '${name}'", actions )
 }
 
+static setup_git_config( script )
+{
+  script.sh( "git config --global user.email \"${script.env.BUILD_NOTIFICATION_EMAIL}\"" )
+  script.sh( 'git config --global user.name "Build Tool"' )
+}
+
 static prepare_auto_merge( script, target_branch )
 {
   script.env.LOCAL_GIT_COMMIT = script.sh( script: 'git rev-parse HEAD', returnStdout: true ).trim()
   script.env.LOCAL_MASTER_GIT_COMMIT =
     script.sh( script: "git show-ref --hash refs/remotes/origin/${target_branch}", returnStdout: true ).trim()
   script.echo "Automerge branch ${script.env.BRANCH_NAME} detected. Merging ${target_branch}."
-  script.sh( "git config --global user.email \"${script.env.BUILD_NOTIFICATION_EMAIL}\"" )
-  script.sh( 'git config --global user.name "Build Tool"' )
+  setup_git_config( script )
   script.sh( "git merge origin/${target_branch}" )
 }
 
