@@ -24,7 +24,11 @@ static prepare_stage( script, Map options = [:] )
 {
   script.stage( 'Prepare' ) {
     script.sh 'git reset --hard'
-    script.sh 'git clean -ffdx'
+    def clean_repository = options.clean == null ? true : options.clean
+    if ( clean_repository )
+    {
+      script.sh 'git clean -ffdx'
+    }
     script.env.BUILD_NUMBER = "${script.env.BUILD_NUMBER}"
     script.env.PRODUCT_VERSION =
       script.sh( script: 'echo $BUILD_NUMBER-`git rev-parse --short HEAD`', returnStdout: true ).trim()
