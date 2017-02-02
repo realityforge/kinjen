@@ -29,10 +29,13 @@ static prepare_stage( script, Map options = [:] )
     {
       script.sh 'git clean -ffdx'
     }
-    script.env.BUILD_NUMBER = "${script.env.BUILD_NUMBER}"
-    script.env.PRODUCT_VERSION =
-      script.sh( script: 'echo $BUILD_NUMBER-`git rev-parse --short HEAD`', returnStdout: true ).trim()
-
+    def versions_envs = options.versions_envs == null ? true : options.versions_envs
+    if ( versions_envs )
+    {
+      script.env.BUILD_NUMBER = "${script.env.BUILD_NUMBER}"
+      script.env.PRODUCT_VERSION =
+        script.sh( script: 'echo $BUILD_NUMBER-`git rev-parse --short HEAD`', returnStdout: true ).trim()
+    }
     def include_ruby = options.ruby == null ? true : options.ruby
     if ( include_ruby )
     {
