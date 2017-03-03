@@ -226,6 +226,7 @@ static deploy_stage( script, project_key )
 static guard_build( script, Map options = [:], actions )
 {
   def notify_github = options.notify_github == null ? true : options.notify_github
+  def build_context = options.build_context == null ? 'jenkins' : options.build_context
   def email = options.email == null ? true : options.email
   def err = null
 
@@ -234,7 +235,7 @@ static guard_build( script, Map options = [:], actions )
     script.currentBuild.result = 'SUCCESS'
     if ( notify_github )
     {
-      script.step( [$class: 'GitHubSetCommitStatusBuilder', contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: 'jenkins']] )
+      script.step( [$class: 'GitHubCommitStatusSetter', contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: build_context], statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: 'Building in jenkins', state: 'PENDING']]]])
     }
 
     actions()
@@ -248,8 +249,16 @@ static guard_build( script, Map options = [:], actions )
   {
     if ( notify_github )
     {
-      script.step( [$class: 'GitHubCommitNotifier', resultOnFailure: 'FAILURE'] )
+      if ( script.currentBuild.result == 'SUCCESS' )
+      {
+        script.step( [$class: 'GitHubCommitStatusSetter', contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: build_context], statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: 'Successfully built', state: 'SUCCESS']]]])
+      }
+      else
+      {
+        script.step( [$class: 'GitHubCommitStatusSetter', contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: build_context], statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: 'Failed to build', state: 'FAILURE']]]])
+      }
     }
+
     if ( email )
     {
       send_notifications( script )
