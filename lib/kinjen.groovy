@@ -234,7 +234,7 @@ static guard_build( script, Map options = [:], actions )
     script.currentBuild.result = 'SUCCESS'
     if ( notify_github )
     {
-      script.step( [$class: 'GitHubSetCommitStatusBuilder'] )
+      script.step( [$class: 'GitHubSetCommitStatusBuilder', contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: 'jenkins']] )
     }
 
     actions()
