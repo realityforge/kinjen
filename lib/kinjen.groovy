@@ -311,7 +311,6 @@ static complete_auto_merge( script, target_branch )
       script.sh( "git merge origin/${target_branch}" )
       script.echo( 'Changes merged.' )
       script.sh( "git push origin HEAD:${script.env.BRANCH_NAME}" )
-      script.sh( "git checkout ${script.env.LOCAL_GIT_COMMIT}" )
     }
   }
   else
