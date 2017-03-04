@@ -223,6 +223,29 @@ static deploy_stage( script, project_key )
   }
 }
 
+static set_github_status( script, state, message, Map options = [:] )
+{
+  def build_context = options.build_context == null ? 'jenkins' : options.build_context
+
+  if ( options.git_commit != null )
+  {
+    script.step( [
+      $class            : 'GitHubCommitStatusSetter',
+      commitShaSource   : [$class: 'ManuallyEnteredShaSource', sha: options.git_commit],
+      contextSource     : [$class: 'ManuallyEnteredCommitContextSource', context: build_context],
+      statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: message, state: state]]]
+    ] )
+  }
+  else
+  {
+    script.step( [
+      $class            : 'GitHubCommitStatusSetter',
+      contextSource     : [$class: 'ManuallyEnteredCommitContextSource', context: build_context],
+      statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: message, state: state]]]
+    ] )
+  }
+}
+
 static guard_build( script, Map options = [:], actions )
 {
   def notify_github = options.notify_github == null ? true : options.notify_github
@@ -235,7 +258,7 @@ static guard_build( script, Map options = [:], actions )
     script.currentBuild.result = 'SUCCESS'
     if ( notify_github )
     {
-      script.step( [$class: 'GitHubCommitStatusSetter', contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: build_context], statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: 'Building in jenkins', state: 'PENDING']]]])
+      set_github_status( script, 'PENDING', 'Building in jenkins', [build_context: build_context] )
     }
 
     actions()
@@ -251,11 +274,11 @@ static guard_build( script, Map options = [:], actions )
     {
       if ( script.currentBuild.result == 'SUCCESS' )
       {
-        script.step( [$class: 'GitHubCommitStatusSetter', contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: build_context], statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: 'Successfully built', state: 'SUCCESS']]]])
+        set_github_status( script, 'SUCCESS', 'Successfully built', [build_context: build_context] )
       }
       else
       {
-        script.step( [$class: 'GitHubCommitStatusSetter', contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: build_context], statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: 'Failed to build', state: 'FAILURE']]]])
+        set_github_status( script, 'FAILURE', 'Failed to build', [build_context: build_context] )
       }
     }
 
