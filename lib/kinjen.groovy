@@ -9,7 +9,7 @@ static extract_auto_merge_target( script )
   }
   else if ( script.env.BRANCH_NAME ==~ /^AM-([^_]+)_.*$/ )
   {
-    return script.env.BRANCH_NAME.replaceFirst(/^AM-([^_]+)_.*$/, '$1')
+    return script.env.BRANCH_NAME.replaceFirst( /^AM-([^_]+)_.*$/, '$1' )
   }
   else
   {
