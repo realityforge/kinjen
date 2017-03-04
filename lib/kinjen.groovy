@@ -319,8 +319,6 @@ static complete_auto_merge( script, target_branch )
     script.echo "Pushing automerge branch ${script.env.BRANCH_NAME}."
     if ( script.env.LOCAL_GIT_COMMIT == script.env.LATEST_REMOTE_GIT_COMMIT )
     {
-      // Add sleep so github will have enough time to register the commit status
-      script.sleep 10
       script.sh( "git push origin HEAD:${target_branch}" )
       script.sh( "git push origin :${script.env.BRANCH_NAME}" )
     }
