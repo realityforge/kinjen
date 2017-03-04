@@ -298,7 +298,7 @@ static prepare_auto_merge( script, target_branch )
 static complete_auto_merge( script, target_branch )
 {
   setup_git_credentials( script )
-  script.sh( "git fetch --prune" )
+  script.sh( 'git fetch --prune' )
   script.env.LATEST_REMOTE_MASTER_GIT_COMMIT =
     script.sh( script: "git show-ref --hash refs/remotes/origin/${target_branch}", returnStdout: true ).trim()
   script.env.LATEST_REMOTE_GIT_COMMIT =
