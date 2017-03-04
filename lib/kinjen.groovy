@@ -316,9 +316,9 @@ static complete_auto_merge( script, target_branch )
   }
   else
   {
-    script.echo "Pushing automerge branch ${script.env.BRANCH_NAME}."
     if ( script.env.LOCAL_GIT_COMMIT == script.env.LATEST_REMOTE_GIT_COMMIT )
     {
+      script.echo "Merging automerge branch ${script.env.BRANCH_NAME}."
       script.sh( "git push origin HEAD:${target_branch}" )
       script.sh( "git push origin :${script.env.BRANCH_NAME}" )
     }
