@@ -318,8 +318,10 @@ static prepare_auto_merge( script, target_branch )
   script.sh( "git merge origin/${target_branch}" )
 }
 
-static complete_auto_merge( script, target_branch )
+static complete_auto_merge( script, target_branch, Map options = [:] )
 {
+  def build_context = options.build_context == null ? 'jenkins' : options.build_context
+
   setup_git_credentials( script )
   script.sh( 'git fetch --prune' )
   script.env.LATEST_REMOTE_MASTER_GIT_COMMIT =
@@ -341,6 +343,12 @@ static complete_auto_merge( script, target_branch )
     if ( script.env.LOCAL_GIT_COMMIT == script.env.LATEST_REMOTE_GIT_COMMIT )
     {
       script.echo "Merging automerge branch ${script.env.BRANCH_NAME}."
+      def git_commit = script.sh( script: 'git rev-parse HEAD', returnStdout: true ).trim()
+      if( script.env.LOCAL_GIT_COMMIT != git_commit )
+      {
+        script.sh( "git push origin HEAD:${script.env.BRANCH_NAME}" )
+        set_github_status( script, 'SUCCESS', 'Successfully built', [build_context: build_context, git_commit: git_commit] )
+      }
       script.sh( "git push origin HEAD:${target_branch}" )
       script.sh( "git push origin :${script.env.BRANCH_NAME}" )
     }
