@@ -233,7 +233,7 @@ static set_github_status( script, state, message, Map options = [:] )
       $class            : 'GitHubCommitStatusSetter',
       commitShaSource   : [$class: 'ManuallyEnteredShaSource', sha: options.git_commit],
       contextSource     : [$class: 'ManuallyEnteredCommitContextSource', context: build_context],
-      errorHandlers     : [[$class: 'ChangingBuildStatusErrorHandler']],
+      errorHandlers     : [[$class: 'ChangingBuildStatusErrorHandler', result: 'UNSTABLE']],
       statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: message, state: state]]]
     ] )
   }
@@ -242,7 +242,7 @@ static set_github_status( script, state, message, Map options = [:] )
     script.step( [
       $class            : 'GitHubCommitStatusSetter',
       contextSource     : [$class: 'ManuallyEnteredCommitContextSource', context: build_context],
-      errorHandlers     : [[$class: 'ChangingBuildStatusErrorHandler']],
+      errorHandlers     : [[$class: 'ChangingBuildStatusErrorHandler', result: 'UNSTABLE']],
       statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: message, state: state]]]
     ] )
   }
