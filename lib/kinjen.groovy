@@ -233,6 +233,7 @@ static set_github_status( script, state, message, Map options = [:] )
       $class            : 'GitHubCommitStatusSetter',
       commitShaSource   : [$class: 'ManuallyEnteredShaSource', sha: options.git_commit],
       contextSource     : [$class: 'ManuallyEnteredCommitContextSource', context: build_context],
+      errorHandlers     : [[$class: 'ChangingBuildStatusErrorHandler']],
       statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: message, state: state]]]
     ] )
   }
@@ -241,6 +242,7 @@ static set_github_status( script, state, message, Map options = [:] )
     script.step( [
       $class            : 'GitHubCommitStatusSetter',
       contextSource     : [$class: 'ManuallyEnteredCommitContextSource', context: build_context],
+      errorHandlers     : [[$class: 'ChangingBuildStatusErrorHandler']],
       statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: message, state: state]]]
     ] )
   }
@@ -344,7 +346,7 @@ static complete_auto_merge( script, target_branch, Map options = [:] )
     {
       script.echo "Merging automerge branch ${script.env.BRANCH_NAME}."
       def git_commit = script.sh( script: 'git rev-parse HEAD', returnStdout: true ).trim()
-      if( script.env.LOCAL_GIT_COMMIT != git_commit )
+      if ( script.env.LOCAL_GIT_COMMIT != git_commit )
       {
         script.sh( "git push origin HEAD:${script.env.BRANCH_NAME}" )
         set_github_status( script, 'SUCCESS', 'Successfully built', [build_context: build_context, git_commit: git_commit] )
