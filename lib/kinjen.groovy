@@ -40,6 +40,7 @@ static prepare_stage( script, Map options = [:] )
     if ( include_ruby )
     {
       script.sh 'echo "gem: --no-ri --no-rdoc" > ~/.gemrc'
+      script.retry( 8 ) { script.sh 'gem install octokit -v 4.6.2' }
       script.retry( 8 ) { script.sh 'bundle install; rbenv rehash' }
       def include_buildr = options.buildr == null ? true : options.buildr
       if ( include_buildr )
@@ -223,11 +224,26 @@ static deploy_stage( script, project_key )
   }
 }
 
+/**
+ * The builtin jenkins capabilities do not deal well with api rate limiting, as a result jenkins believes
+ * the status has been set but it has not been. Hence the need for custom ruby code. However this may need
+ * to run prior to ruby having being setup so it falls back to the old methods in this scenario.
+ */
 static set_github_status( script, state, message, Map options = [:] )
 {
   def build_context = options.build_context == null ? 'jenkins' : options.build_context
+  def git_commit = options.git_commit == null ? script.env.GIT_COMMIT : options.git_commit
+  def target_url = options.target_url == null ? script.env.BUILD_URL : options.target_url
+  def git_project = options.git_project == null ? script.env.GIT_ORIGIN.replaceAll( /^https:\/\/github\.com\//, '' ).replaceAll( /\.git$/, '' ) : options.git_project
+  def use_ruby = options.use_ruby == null ? (script.sh( script: 'gem list | grep octokit', returnStatus: true ) == 0 ) : options.use_ruby
 
-  if ( options.git_commit != null )
+  script.echo "Set Github Status -- Git Project: ${git_project}, Use Ruby?: ${use_ruby}, Context: ${build_context}, SHA1: ${git_commit}, Target URL: ${target_url}"
+
+  if ( use_ruby )
+  {
+    script.sh "ruby -e \"require 'octokit';Octokit::Client.new(:netrc => true).create_status('${git_project}', '${git_commit}', '${state}', :context => '${build_context}', :description => '${message}', :target_url => '${target_url}')\""
+  }
+  else if ( options.git_commit != null )
   {
     script.step( [
       $class            : 'GitHubCommitStatusSetter',
