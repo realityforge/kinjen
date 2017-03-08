@@ -41,6 +41,7 @@ static prepare_stage( script, Map options = [:] )
     {
       script.sh 'echo "gem: --no-ri --no-rdoc" > ~/.gemrc'
       script.retry( 8 ) { script.sh 'gem install octokit -v 4.6.2' }
+      script.retry( 8 ) { script.sh 'gem install netrc -v 0.11.0' }
       script.retry( 8 ) { script.sh 'bundle install; rbenv rehash' }
       def include_buildr = options.buildr == null ? true : options.buildr
       if ( include_buildr )
@@ -276,7 +277,7 @@ static guard_build( script, Map options = [:], actions )
     script.currentBuild.result = 'SUCCESS'
     if ( notify_github )
     {
-      set_github_status( script, 'PENDING', 'Building in jenkins', [build_context: build_context] )
+      set_github_status( script, 'pending', 'Building in jenkins', [build_context: build_context] )
     }
 
     actions()
@@ -292,11 +293,11 @@ static guard_build( script, Map options = [:], actions )
     {
       if ( script.currentBuild.result == 'SUCCESS' )
       {
-        set_github_status( script, 'SUCCESS', 'Successfully built', [build_context: build_context] )
+        set_github_status( script, 'success', 'Successfully built', [build_context: build_context] )
       }
       else
       {
-        set_github_status( script, 'FAILURE', 'Failed to build', [build_context: build_context] )
+        set_github_status( script, 'failure', 'Failed to build', [build_context: build_context] )
       }
     }
 
@@ -382,7 +383,8 @@ static setup_git_credentials( script, Map options = [:] )
                             usernameVariable: 'GIT_USERNAME',
                             passwordVariable: 'GIT_PASSWORD']] ) {
     script.sh "echo \"machine github.com login ${script.GIT_USERNAME} password ${script.GIT_PASSWORD}\" > ~/.netrc"
-    script.sh "echo \"api.machine github.com login ${script.GIT_USERNAME} password ${script.GIT_PASSWORD}\" >> ~/.netrc"
+    script.sh "echo \"machine api.github.com login ${script.GIT_USERNAME} password ${script.GIT_PASSWORD}\" >> ~/.netrc"
+    script.sh "chmod 0600 ~/.netrc"
   }
 }
 
