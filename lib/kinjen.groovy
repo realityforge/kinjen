@@ -304,19 +304,11 @@ static run_in_container( script, image_name, actions )
   script.docker.image( image_name ).inside( "--name '${name}'", actions )
 }
 
-static setup_git_config( script )
-{
-  script.sh( "git config --global user.email \"${script.env.BUILD_NOTIFICATION_EMAIL}\"" )
-  script.sh( 'git config --global user.name "Build Tool"' )
-}
-
 static prepare_auto_merge( script, target_branch )
 {
-  script.env.LOCAL_GIT_COMMIT = script.sh( script: 'git rev-parse HEAD', returnStdout: true ).trim()
-  script.env.LOCAL_MASTER_GIT_COMMIT =
+  script.env.LOCAL_TARGET_GIT_COMMIT =
     script.sh( script: "git show-ref --hash refs/remotes/origin/${target_branch}", returnStdout: true ).trim()
-  script.echo "Automerge branch ${script.env.BRANCH_NAME} detected. Merging ${target_branch}."
-  setup_git_config( script )
+  script.echo "Automerge branch ${script.env.BRANCH_NAME} detected. Merging ${target_branch} into local branch."
   script.sh( "git merge origin/${target_branch}" )
 }
 
@@ -324,15 +316,14 @@ static complete_auto_merge( script, target_branch, Map options = [:] )
 {
   def build_context = options.build_context == null ? 'jenkins' : options.build_context
 
-  setup_git_credentials( script )
   script.sh( 'git fetch --prune' )
   script.env.LATEST_REMOTE_MASTER_GIT_COMMIT =
     script.sh( script: "git show-ref --hash refs/remotes/origin/${target_branch}", returnStdout: true ).trim()
   script.env.LATEST_REMOTE_GIT_COMMIT =
     script.sh( script: "git show-ref --hash refs/remotes/origin/${script.env.BRANCH_NAME}", returnStdout: true ).trim()
-  if ( script.env.LOCAL_MASTER_GIT_COMMIT != script.env.LATEST_REMOTE_MASTER_GIT_COMMIT )
+  if ( script.env.LOCAL_TARGET_GIT_COMMIT != script.env.LATEST_REMOTE_MASTER_GIT_COMMIT )
   {
-    if ( script.env.LOCAL_GIT_COMMIT == script.env.LATEST_REMOTE_GIT_COMMIT )
+    if ( script.env.GIT_COMMIT == script.env.LATEST_REMOTE_GIT_COMMIT )
     {
       script.echo( "Merging changes from ${target_branch} to kick off another build cycle." )
       script.sh( "git merge origin/${target_branch}" )
@@ -342,11 +333,11 @@ static complete_auto_merge( script, target_branch, Map options = [:] )
   }
   else
   {
-    if ( script.env.LOCAL_GIT_COMMIT == script.env.LATEST_REMOTE_GIT_COMMIT )
+    if ( script.env.GIT_COMMIT == script.env.LATEST_REMOTE_GIT_COMMIT )
     {
       script.echo "Merging automerge branch ${script.env.BRANCH_NAME}."
       def git_commit = script.sh( script: 'git rev-parse HEAD', returnStdout: true ).trim()
-      if ( script.env.LOCAL_GIT_COMMIT != git_commit )
+      if ( script.env.GIT_COMMIT != git_commit )
       {
         script.sh( "git push origin HEAD:${script.env.BRANCH_NAME}" )
         set_github_status( script, 'SUCCESS', 'Successfully built', [build_context: build_context, git_commit: git_commit] )
@@ -355,6 +346,15 @@ static complete_auto_merge( script, target_branch, Map options = [:] )
       script.sh( "git push origin :${script.env.BRANCH_NAME}" )
     }
   }
+}
+
+static config_git( script, Map options = [:] )
+{
+  script.sh( "git config --global user.email \"${script.env.BUILD_NOTIFICATION_EMAIL}\"" )
+  script.sh( 'git config --global user.name "Build Tool"' )
+  script.env.GIT_COMMIT = script.sh( script: 'git rev-parse HEAD', returnStdout: true ).trim()
+  script.env.GIT_ORIGIN = script.sh( script: 'git remote get-url origin', returnStdout: true ).trim()
+  setup_git_credentials( script, options )
 }
 
 static setup_git_credentials( script, Map options = [:] )
@@ -366,6 +366,7 @@ static setup_git_credentials( script, Map options = [:] )
                             usernameVariable: 'GIT_USERNAME',
                             passwordVariable: 'GIT_PASSWORD']] ) {
     script.sh "echo \"machine github.com login ${script.GIT_USERNAME} password ${script.GIT_PASSWORD}\" > ~/.netrc"
+    script.sh "echo \"api.machine github.com login ${script.GIT_USERNAME} password ${script.GIT_PASSWORD}\" >> ~/.netrc"
   }
 }
 
