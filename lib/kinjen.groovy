@@ -235,7 +235,7 @@ static set_github_status( script, state, message, Map options = [:] )
   def build_context = options.build_context == null ? 'jenkins' : options.build_context
   def git_commit = options.git_commit == null ? script.env.GIT_COMMIT : options.git_commit
   def target_url = options.target_url == null ? script.env.BUILD_URL : options.target_url
-  def git_project = options.git_project == null ? script.env.GIT_ORIGIN.replaceAll( /^https:\/\/github\.com\//, '' ).replaceAll( /\.git$/, '' ) : options.git_project
+  def git_project = options.git_project == null ? script.env.GIT_PROJECT : options.git_project
   def use_ruby = options.use_ruby == null ? (script.sh( script: 'gem list | grep octokit', returnStatus: true ) == 0 ) : options.use_ruby
 
   script.echo "Set Github Status -- Git Project: ${git_project}, Use Ruby: ${use_ruby}, Context: ${build_context}, SHA1: ${git_commit}, Target URL: ${target_url}"
@@ -374,6 +374,8 @@ static config_git( script, Map options = [:] )
   script.sh( 'git config --global user.name "Build Tool"' )
   script.env.GIT_COMMIT = script.sh( script: 'git rev-parse HEAD', returnStdout: true ).trim()
   script.env.GIT_ORIGIN = script.sh( script: 'git remote get-url origin', returnStdout: true ).trim()
+  script.env.GIT_PROJECT =
+    script.env.GIT_ORIGIN.replaceAll( /^https:\/\/github\.com\//, '' ).replaceAll( /\.git$/, '' )
   setup_git_credentials( script, options )
 }
 
