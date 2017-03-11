@@ -268,7 +268,7 @@ static set_github_status( script, state, message, Map options = [:] )
   }
 }
 
-static guard_build( script, Map options = [:], actions )
+static do_guard_build( script, Map options = [:], actions )
 {
   def notify_github = options.notify_github == null ? true : options.notify_github
   def build_context = options.build_context == null ? 'jenkins' : options.build_context
@@ -312,6 +312,20 @@ static guard_build( script, Map options = [:], actions )
     {
       throw err
     }
+  }
+}
+
+static guard_build( script, Map options = [:], actions )
+{
+  if ( options.lock_name && '' != options.lock_name )
+  {
+    script.lock( resource: "${script.env.GIT_PROJECT.replaceAll( /\//, '_' )}_${options.lock_name}" ) {
+      script.kinjen.do_guard_build( script, options, actions )
+    }
+  }
+  else
+  {
+    script.kinjen.do_guard_build( script, options, actions )
   }
 }
 
