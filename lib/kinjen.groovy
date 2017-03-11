@@ -357,7 +357,7 @@ static complete_auto_merge( script, target_branch, Map options = [:] )
       if ( script.env.GIT_COMMIT != git_commit )
       {
         script.sh( "git push origin HEAD:${script.env.BRANCH_NAME}" )
-        set_github_status( script, 'SUCCESS', 'Successfully built', [build_context: build_context, git_commit: git_commit] )
+        set_github_status( script, 'success', 'Successfully built', [build_context: build_context, git_commit: git_commit] )
       }
       script.sh( "git push origin HEAD:${target_branch}" )
       script.sh( "git push origin :${script.env.BRANCH_NAME}" )
