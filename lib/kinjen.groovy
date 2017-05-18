@@ -40,13 +40,13 @@ static prepare_stage( script, Map options = [:] )
     if ( include_ruby )
     {
       script.sh 'echo "gem: --no-ri --no-rdoc" > ~/.gemrc'
-      script.retry( 8 ) { script.sh 'gem install octokit -v 4.6.2' }
-      script.retry( 8 ) { script.sh 'gem install netrc -v 0.11.0' }
-      script.retry( 8 ) { script.sh 'bundle install; rbenv rehash' }
+      script.retry( 2 ) { script.sh 'gem install octokit -v 4.6.2' }
+      script.retry( 2 ) { script.sh 'gem install netrc -v 0.11.0' }
+      script.retry( 2 ) { script.sh 'bundle install; rbenv rehash' }
       def include_buildr = options.buildr == null ? true : options.buildr
       if ( include_buildr )
       {
-        script.retry( 8 ) { script.sh 'bundle exec buildr artifacts' }
+        script.retry( 2 ) { script.sh 'bundle exec buildr artifacts' }
       }
     }
   }
