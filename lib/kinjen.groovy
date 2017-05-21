@@ -192,11 +192,12 @@ static import_variant_stage( script, variant )
 /**
  * A task that triggers the zimming out of dependencies to downstream projects.
  */
-static zim_stage( script, dependencies )
+static zim_stage( script, name, dependencies )
 {
   script.stage( 'Zim' ) {
     script.build job: 'zim/upgrade_dependency',
                  parameters: [script.string( name: 'DEPENDENCIES', value: dependencies ),
+                              script.string( name: 'NAME', value: name ),
                               script.string( name: 'VERSION', value: "${script.env.PRODUCT_VERSION}" )],
                  wait: false
   }
