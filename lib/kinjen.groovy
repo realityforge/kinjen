@@ -215,11 +215,11 @@ bundle exec buildr ci:publish"""
   }
 }
 
-static deploy_stage( script, project_key )
+static deploy_stage( script, project_key, deployment_environment='development' )
 {
   script.stage( 'Deploy' ) {
-    script.build job: "${project_key}/deploy-to-development",
-                 parameters: [script.string( name: 'PRODUCT_ENVIRONMENT', value: 'development' ),
+    script.build job: "${project_key}/deploy-to-${deployment_environment}",
+                 parameters: [script.string( name: 'PRODUCT_ENVIRONMENT', value: deployment_environment ),
                               script.string( name: 'PRODUCT_NAME', value: project_key ),
                               script.string( name: 'PRODUCT_VERSION', value: "${script.env.PRODUCT_VERSION}" )],
                  wait: false
