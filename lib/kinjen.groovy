@@ -36,6 +36,16 @@ static prepare_stage( script, Map options = [:] )
       script.env.PRODUCT_VERSION =
         script.sh( script: 'echo $BUILD_NUMBER-`git rev-parse --short HEAD`', returnStdout: true ).trim()
     }
+    def include_node = options.node == null ? false : options.node
+    if ( include_node )
+    {
+      script.retry( 2 ) { script.sh 'npm install -g yarn' }
+      def include_yarn = options.yarn == null ? true : options.yarn
+      if ( include_yarn )
+      {
+        script.retry( 2 ) { script.sh 'yarn install; nodenv rehash' }
+      }
+    }
     def include_ruby = options.ruby == null ? true : options.ruby
     if ( include_ruby )
     {
