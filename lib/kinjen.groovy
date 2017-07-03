@@ -228,11 +228,24 @@ bundle exec buildr ci:publish"""
 static deploy_stage( script, project_key, deployment_environment='development' )
 {
   script.stage( 'Deploy' ) {
+    cancel_queued_deploys( script, project_key, deployment_environment )
     script.build job: "${project_key}/deploy-to-${deployment_environment}",
                  parameters: [script.string( name: 'PRODUCT_ENVIRONMENT', value: deployment_environment ),
                               script.string( name: 'PRODUCT_NAME', value: project_key ),
                               script.string( name: 'PRODUCT_VERSION', value: "${script.env.PRODUCT_VERSION}" )],
                  wait: false
+  }
+}
+
+@NonCPS
+def static cancel_queued_deploys( script, project_key, deployment_environment='development' ) {
+  def q = Jenkins.instance.queue
+  for( def i = q.items.size() - 1; i >= 0; i-- ) {
+    if ( q.items[i].task.getFullName() == "${project_key}/deploy-to-${deployment_environment}" )
+    {
+      script.echo "Cancelling queued deploy job ${q.items[i].task.getFullName()}"
+      q.cancel( q.items[i].task )
+    }
   }
 }
 
