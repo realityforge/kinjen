@@ -32,9 +32,8 @@ static prepare_stage( script, Map options = [:] )
     def versions_envs = options.versions_envs == null ? true : options.versions_envs
     if ( versions_envs )
     {
-      script.env.BUILD_NUMBER = "${script.env.BUILD_NUMBER}"
-      script.env.PRODUCT_VERSION =
-        script.sh( script: 'echo $BUILD_NUMBER-`git rev-parse --short HEAD`', returnStdout: true ).trim()
+      script.env.GIT_SHORT_HASH = script.sh( script: 'echo `git rev-parse --short HEAD`', returnStdout: true ).trim()
+      script.env.PRODUCT_VERSION = "${script.env.BUILD_NUMBER}-${script.env.GIT_SHORT_HASH}"
     }
     def include_node = options.node == null ? false : options.node
     if ( include_node )
