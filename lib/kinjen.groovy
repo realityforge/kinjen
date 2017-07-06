@@ -38,7 +38,6 @@ static prepare_stage( script, Map options = [:] )
     def include_node = options.node == null ? false : options.node
     if ( include_node )
     {
-      script.retry( 2 ) { script.sh 'npm install -g yarn' }
       def include_yarn = options.yarn == null ? true : options.yarn
       if ( include_yarn )
       {
