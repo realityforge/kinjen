@@ -259,7 +259,25 @@ static set_github_status( script, state, message, Map options = [:] )
   def git_project = options.git_project == null ? script.env.GIT_PROJECT : options.git_project
 
   script.sh "ruby -e \"require 'octokit';Octokit::Client.new(:netrc => true).create_status('${git_project}', '${git_commit}', '${state}', :context => '${build_context}', :description => '${message}', :target_url => '${target_url}')\""
+}
 
+/**
+ * Return true if status for specified context is successful.
+ * As it uses the installed octokit it can only be run after the initial prepare phase.
+ */
+static is_github_status_success( script, build_context, Map options = [:] )
+{
+  def git_commit = options.git_commit == null ? script.env.GIT_COMMIT : options.git_commit
+  def git_project = options.git_project == null ? script.env.GIT_PROJECT : options.git_project
+
+  def present = script.sh( script: "ruby -e \"require 'octokit';puts Octokit::Client.new(:netrc => true).statuses('${git_project}', '${git_commit}').any?{|s| s[:state] == 'success' && s[:context] == '${build_context}'}\"", returnStdout: true ).trim()
+
+  present.equals( 'true' )
+}
+
+static complete_downstream_actions( script )
+{
+  set_github_status( script, 'success', 'Downstream actions completed', [build_context: 'downstream_updated'] )
 }
 
 static do_guard_build( script, Map options = [:], actions )
@@ -269,6 +287,14 @@ static do_guard_build( script, Map options = [:], actions )
   def email = options.email == null ? true : options.email
   def err = null
 
+  if ( is_github_status_success( script, 'downstream_updated' ) )
+  {
+    script.echo 'Build already occurred (on automerge branch?). Marking build as successful and terminating build.'
+    script.currentBuild.result = 'SUCCESS'
+    script.env.SKIP_DOWNSTREAM = 'true'
+    send_notifications( script )
+    return
+  }
   try
   {
     script.currentBuild.result = 'SUCCESS'
@@ -375,6 +401,7 @@ static complete_auto_merge( script, target_branch, Map options = [:] )
       }
       script.sh( "git push origin HEAD:${target_branch}" )
       script.sh( "git push origin :${script.env.BRANCH_NAME}" )
+      script.env.AUTO_MERGE_COMPLETE = 'true'
     }
   }
 }
