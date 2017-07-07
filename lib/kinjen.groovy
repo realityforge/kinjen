@@ -249,8 +249,7 @@ def static cancel_queued_deploys( script, project_key, deployment_environment='d
 
 /**
  * The builtin jenkins capabilities do not deal well with api rate limiting, as a result jenkins believes
- * the status has been set but it has not been. Hence the need for custom ruby code. However this may need
- * to run prior to ruby having being setup so it falls back to the old methods in this scenario.
+ * the status has been set but it has not been. Hence the need for custom ruby code.
  */
 static set_github_status( script, state, message, Map options = [:] )
 {
@@ -258,35 +257,9 @@ static set_github_status( script, state, message, Map options = [:] )
   def git_commit = options.git_commit == null ? script.env.GIT_COMMIT : options.git_commit
   def target_url = options.target_url == null ? script.env.BUILD_URL : options.target_url
   def git_project = options.git_project == null ? script.env.GIT_PROJECT : options.git_project
-  def use_ruby =
-    options.use_ruby == null ?
-    ( script.sh( script: 'gem list | grep octokit', returnStatus: true ) == 0 ) :
-    options.use_ruby
 
+  script.sh "ruby -e \"require 'octokit';Octokit::Client.new(:netrc => true).create_status('${git_project}', '${git_commit}', '${state}', :context => '${build_context}', :description => '${message}', :target_url => '${target_url}')\""
 
-  if ( use_ruby )
-  {
-    script.sh "ruby -e \"require 'octokit';Octokit::Client.new(:netrc => true).create_status('${git_project}', '${git_commit}', '${state}', :context => '${build_context}', :description => '${message}', :target_url => '${target_url}')\""
-  }
-  else if ( options.git_commit != null )
-  {
-    script.step( [
-      $class            : 'GitHubCommitStatusSetter',
-      commitShaSource   : [$class: 'ManuallyEnteredShaSource', sha: options.git_commit],
-      contextSource     : [$class: 'ManuallyEnteredCommitContextSource', context: build_context],
-      errorHandlers     : [[$class: 'ChangingBuildStatusErrorHandler', result: 'UNSTABLE']],
-      statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: message, state: state]]]
-    ] )
-  }
-  else
-  {
-    script.step( [
-      $class            : 'GitHubCommitStatusSetter',
-      contextSource     : [$class: 'ManuallyEnteredCommitContextSource', context: build_context],
-      errorHandlers     : [[$class: 'ChangingBuildStatusErrorHandler', result: 'UNSTABLE']],
-      statusResultSource: [$class: 'ConditionalStatusResultSource', results: [[$class: 'AnyBuildResult', message: message, state: state]]]
-    ] )
-  }
 }
 
 static do_guard_build( script, Map options = [:], actions )
