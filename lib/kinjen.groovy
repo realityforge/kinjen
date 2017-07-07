@@ -342,12 +342,12 @@ static guard_build( script, Map options = [:], actions )
   if ( options.lock_name && '' != options.lock_name )
   {
     script.lock( resource: "${script.env.GIT_PROJECT.replaceAll( /\//, '_' )}_${options.lock_name}" ) {
-      script.kinjen.do_guard_build( script, options, actions )
+      do_guard_build( script, options, actions )
     }
   }
   else
   {
-    script.kinjen.do_guard_build( script, options, actions )
+    do_guard_build( script, options, actions )
   }
 }
 
