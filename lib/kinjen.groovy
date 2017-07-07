@@ -263,7 +263,6 @@ static set_github_status( script, state, message, Map options = [:] )
     ( script.sh( script: 'gem list | grep octokit', returnStatus: true ) == 0 ) :
     options.use_ruby
 
-  script.echo "Set Github Status -- Git Project: ${git_project}, Use Ruby: ${use_ruby}, Context: ${build_context}, SHA1: ${git_commit}, Target URL: ${target_url}"
 
   if ( use_ruby )
   {
