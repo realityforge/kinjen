@@ -223,7 +223,7 @@ bundle exec buildr ci:publish"""
   }
 }
 
-static deploy_stage( script, project_key, deployment_environment='development' )
+static deploy_stage( script, project_key, deployment_environment = 'development' )
 {
   script.stage( 'Deploy' ) {
     cancel_queued_deploys( script, project_key, deployment_environment )
@@ -236,13 +236,15 @@ static deploy_stage( script, project_key, deployment_environment='development' )
 }
 
 @NonCPS
-def static cancel_queued_deploys( script, project_key, deployment_environment='development' ) {
+def static cancel_queued_deploys( script, project_key, deployment_environment = 'development' )
+{
   def q = Jenkins.instance.queue
-  for( def i = q.items.size() - 1; i >= 0; i-- ) {
-    if ( q.items[i].task.getOwnerTask().getFullName() == "${project_key}/deploy-to-${deployment_environment}" )
+  for ( def i = q.items.size() - 1; i >= 0; i-- )
+  {
+    if ( q.items[ i ].task.getOwnerTask().getFullName() == "${project_key}/deploy-to-${deployment_environment}" )
     {
-      script.echo "Cancelling queued deploy job ${q.items[i].task.getOwnerTask().getFullName()}"
-      q.cancel( q.items[i].task )
+      script.echo "Cancelling queued deploy job ${q.items[ i ].task.getOwnerTask().getFullName()}"
+      q.cancel( q.items[ i ].task )
     }
   }
 }
@@ -270,7 +272,9 @@ static is_github_status_success( script, build_context, Map options = [:] )
   def git_commit = options.git_commit == null ? script.env.GIT_COMMIT : options.git_commit
   def git_project = options.git_project == null ? script.env.GIT_PROJECT : options.git_project
 
-  def present = script.sh( script: "ruby -e \"require 'octokit';puts Octokit::Client.new(:netrc => true).statuses('${git_project}', '${git_commit}').any?{|s| s[:state] == 'success' && s[:context] == '${build_context}'}\"", returnStdout: true ).trim()
+  def present = script.sh(
+    script: "ruby -e \"require 'octokit';puts Octokit::Client.new(:netrc => true).statuses('${git_project}', '${git_commit}').any?{|s| s[:state] == 'success' && s[:context] == '${build_context}'}\"",
+    returnStdout: true ).trim()
 
   present.equals( 'true' )
 }
@@ -505,6 +509,34 @@ static send_notifications( script )
                     replyTo: "${script.env.BUILD_NOTIFICATION_EMAIL}",
                     subject: "\ud83d\udca3 ${script.env.JOB_NAME.replaceAll( '%2F', '/' )} - #${script.env.BUILD_NUMBER} - FAILED",
                     to: "${script.env.BUILD_NOTIFICATION_EMAIL}"
+  }
+}
+
+/**
+ * Method called to complete the build.
+ * Accepts an optional block which contains the downstream actions.
+ */
+static complete_build( script, actions = null )
+{
+  if ( script.currentBuild.result == 'SUCCESS' && script.env.SKIP_DOWNSTREAM != 'true' )
+  {
+    if ( '' != script.env.AUTO_MERGE_TARGET_BRANCH )
+    {
+      complete_auto_merge( script, script.env.AUTO_MERGE_TARGET_BRANCH )
+    }
+    if ( null != actions )
+    {
+      if ( script.env.BRANCH_NAME == 'master' ||
+           ( script.env.AUTO_MERGE_TARGET_BRANCH == 'master' && script.env.AUTO_MERGE_COMPLETE == 'true' ) )
+      {
+        actions()
+        complete_downstream_actions( script )
+      }
+    }
+    else
+    {
+      complete_downstream_actions( script )
+    }
   }
 }
 
