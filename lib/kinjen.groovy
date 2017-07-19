@@ -289,9 +289,10 @@ static do_guard_build( script, Map options = [:], actions )
   def notify_github = options.notify_github == null ? true : options.notify_github
   def build_context = options.build_context == null ? 'jenkins' : options.build_context
   def email = options.email == null ? true : options.email
+  def force_rebuild = options.force_rebuild == null ? false : options.force_rebuild
   def err = null
 
-  if ( is_github_status_success( script, 'downstream_updated' ) )
+  if ( !force_rebuild && is_github_status_success( script, 'downstream_updated' ) )
   {
     script.echo 'Build already occurred (on automerge branch?). Marking build as successful and terminating build.'
     script.currentBuild.result = 'SUCCESS'
