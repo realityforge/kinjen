@@ -385,30 +385,49 @@ static complete_auto_merge( script, target_branch, Map options = [:] )
     if ( script.env.GIT_COMMIT == script.env.LATEST_REMOTE_GIT_COMMIT )
     {
       script.echo( "Merging changes from ${target_branch} to kick off another build cycle." )
+      def pre_merge_git_commit = script.sh( script: 'git rev-parse HEAD', returnStdout: true ).trim()
       script.sh( "git merge origin/${target_branch}" )
-      script.echo( 'Changes merged.' )
-      script.sh( "git push origin HEAD:${script.env.BRANCH_NAME}" )
+      def post_merge_git_commit = script.sh( script: 'git rev-parse HEAD', returnStdout: true ).trim()
+      if ( pre_merge_git_commit != post_merge_git_commit )
+      {
+        script.echo( 'Changes merged.' )
+        script.sh( "git push origin HEAD:${script.env.BRANCH_NAME}" )
+      }
+      else
+      {
+        /*
+         * The target branch has been updated but current branch was includes the changes in the target
+         * branch. This can occur if branch A was merged into the target branch but the current branch was
+         * branched off branch A. In this case it is safe to merge it into master.
+         */
+        perform_auto_merge( script, target_branch, build_context )
+      }
     }
   }
   else
   {
     if ( script.env.GIT_COMMIT == script.env.LATEST_REMOTE_GIT_COMMIT )
     {
-      script.echo "Merging automerge branch ${script.env.BRANCH_NAME}."
-      def git_commit = script.sh( script: 'git rev-parse HEAD', returnStdout: true ).trim()
-      if ( script.env.GIT_COMMIT != git_commit )
-      {
-        script.sh( "git push origin HEAD:${script.env.BRANCH_NAME}" )
-        set_github_status( script,
-                           'success',
-                           'Successfully built',
-                           [build_context: build_context, git_commit: git_commit] )
-      }
-      script.sh( "git push origin HEAD:${target_branch}" )
-      script.sh( "git push origin :${script.env.BRANCH_NAME}" )
-      script.env.AUTO_MERGE_COMPLETE = 'true'
+      perform_auto_merge( script, target_branch, build_context )
     }
   }
+}
+
+static perform_auto_merge( script, target_branch, build_context )
+{
+  script.echo "Merging automerge branch ${script.env.BRANCH_NAME}."
+  def git_commit = script.sh( script: 'git rev-parse HEAD', returnStdout: true ).trim()
+  if ( script.env.GIT_COMMIT != git_commit )
+  {
+    script.sh( "git push origin HEAD:${script.env.BRANCH_NAME}" )
+    set_github_status( script,
+                       'success',
+                       'Successfully built',
+                       [build_context: build_context, git_commit: git_commit] )
+  }
+  script.sh( "git push origin HEAD:${target_branch}" )
+  script.sh( "git push origin :${script.env.BRANCH_NAME}" )
+  script.env.AUTO_MERGE_COMPLETE = 'true'
 }
 
 static config_git( script, Map options = [:] )
