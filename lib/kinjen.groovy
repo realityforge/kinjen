@@ -434,6 +434,7 @@ static config_git( script, Map options = [:] )
 {
   script.sh( "git config --global user.email \"${script.env.BUILD_NOTIFICATION_EMAIL}\"" )
   script.sh( 'git config --global user.name "Build Tool"' )
+  script.sh( 'git config --global core.autocrlf false' )
   script.env.GIT_COMMIT = script.sh( script: 'git rev-parse HEAD', returnStdout: true ).trim()
   script.env.GIT_ORIGIN = script.sh( script: 'git remote get-url origin', returnStdout: true ).trim()
   script.env.GIT_PROJECT =
