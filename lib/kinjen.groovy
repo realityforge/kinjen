@@ -173,7 +173,7 @@ static package_stage( script, Map options = [:] )
 static pg_package_stage( script )
 {
   script.stage( 'Pg Package' ) {
-    script.sh 'xvfb-run -a bundle exec buildr clean; export DB_TYPE=pg; xvfb-run -a bundle exec buildr ci:package_no_test'
+    script.sh 'xvfb-run -a bundle exec buildr clean; xvfb-run -a bundle exec buildr ci:package_no_test DB_TYPE=pg'
   }
 }
 
