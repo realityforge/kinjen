@@ -257,8 +257,7 @@ def static cancel_queued_zims( script, name, dependencies )
   for ( def i = q.items.size() - 1; i >= 0; i-- )
   {
     if ( q.items[ i ].task.getOwnerTask().getFullName() == "zim/upgrade_dependency" &&
-         q.items[ i ].params =~ /NAME=${name.replaceAll("\\.", "\\\\.")}[^.]/ &&
-         q.items[ i ].params =~ /DEPENDENCIES=${dependencies.replaceAll("\\.", "\\\\.")}/)
+         ( q.items[ i ].params + "\n" ).contains( "NAME=${name}\n" ) )
     {
       script.echo "Cancelling queued zim update job: ${q.items[ i ].params}"
       q.cancel( q.items[ i ].task )
