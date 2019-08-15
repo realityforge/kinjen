@@ -203,7 +203,7 @@ static import_variant_stage( script, variant )
 static zim_stage( script, name, dependencies )
 {
   script.stage( 'Zim' ) {
-    cancel_queued_zims( script, name, dependencies )
+    cancel_queued_zims( script, name )
     script.build job: 'zim/upgrade_dependency',
                  parameters: [script.string( name: 'DEPENDENCIES', value: dependencies ),
                               script.string( name: 'NAME', value: name ),
@@ -251,7 +251,7 @@ def static cancel_queued_deploys( script, project_key, deployment_environment = 
 }
 
 @NonCPS
-def static cancel_queued_zims( script, name, dependencies )
+def static cancel_queued_zims( script, name )
 {
   def q = Jenkins.instance.queue
   for ( def i = q.items.size() - 1; i >= 0; i-- )
