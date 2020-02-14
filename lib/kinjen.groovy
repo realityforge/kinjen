@@ -276,7 +276,8 @@ static set_github_status( script, state, message, Map options = [:] )
   def target_url = options.target_url == null ? script.env.BUILD_URL : options.target_url
   def git_project = options.git_project == null ? script.env.GIT_PROJECT : options.git_project
 
-  script.sh "ruby -e \"require 'octokit';Octokit::Client.new(:netrc => true).create_status('${git_project}', '${git_commit}', '${state}', :context => '${build_context}', :description => '${message}', :target_url => '${target_url}')\""
+  script.
+    sh "ruby -e \"require 'octokit';Octokit::Client.new(:netrc => true).create_status('${git_project}', '${git_commit}', '${state}', :context => '${build_context}', :description => '${message}', :target_url => '${target_url}')\""
 }
 
 /**
@@ -481,11 +482,12 @@ static send_notifications( script )
   {
     script.echo "Emailing SUCCESS notification to ${script.env.BUILD_NOTIFICATION_EMAIL}"
 
-    script.emailext body: "<p>Check console output at <a href=\"${script.env.BUILD_URL}\">${script.env.BUILD_URL}</a> to view the results.</p>",
-                    mimeType: 'text/html',
-                    replyTo: "${script.env.BUILD_NOTIFICATION_EMAIL}",
-                    subject: "\ud83d\udc4d ${script.env.JOB_NAME.replaceAll( '%2F', '/' )} - #${script.env.BUILD_NUMBER} - SUCCESS",
-                    to: "${script.env.BUILD_NOTIFICATION_EMAIL}"
+    script.
+      emailext body: "<p>Check console output at <a href=\"${script.env.BUILD_URL}\">${script.env.BUILD_URL}</a> to view the results.</p>",
+               mimeType: 'text/html',
+               replyTo: "${script.env.BUILD_NOTIFICATION_EMAIL}",
+               subject: "\ud83d\udc4d ${script.env.JOB_NAME.replaceAll( '%2F', '/' )} - #${script.env.BUILD_NUMBER} - SUCCESS",
+               to: "${script.env.BUILD_NOTIFICATION_EMAIL}"
   }
 
   if ( script.currentBuild.result != 'SUCCESS' )
