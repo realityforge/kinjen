@@ -421,12 +421,9 @@ static complete_auto_merge( script, target_branch, Map options = [:] )
       }
     }
   }
-  else
+  else if ( script.env.GIT_COMMIT == script.env.LATEST_REMOTE_GIT_COMMIT )
   {
-    if ( script.env.GIT_COMMIT == script.env.LATEST_REMOTE_GIT_COMMIT )
-    {
-      perform_auto_merge( script, target_branch, build_context )
-    }
+    perform_auto_merge( script, target_branch, build_context )
   }
 }
 
@@ -443,7 +440,11 @@ static perform_auto_merge( script, target_branch, build_context )
                        [build_context: build_context, git_commit: git_commit] )
   }
   script.sh( "git push origin HEAD:${target_branch}" )
-  script.sh( "git push origin :${script.env.BRANCH_NAME}" )
+  /*
+   * Return status so we can ignore failures for next command. Some of our repositories will
+   * automatically remove branches merged to master and thus step may fail.
+   */
+  script.sh( script: "git push origin :${script.env.BRANCH_NAME}", returnStatus: true )
   script.env.AUTO_MERGE_COMPLETE = 'true'
 }
 
