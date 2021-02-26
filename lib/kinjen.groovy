@@ -120,16 +120,6 @@ static commit_stage( script, project_key, Map options = [:] )
                                    reportFiles          : 'pmd.html',
                                    reportName           : 'PMD Issues'] )
     }
-    def include_jdepend = options.jdepend == null ? false : options.jdepend
-    if ( include_jdepend )
-    {
-      script.publishHTML( target: [allowMissing         : false,
-                                   alwaysLinkToLastBuild: false,
-                                   keepAll              : true,
-                                   reportDir            : "reports/${project_key}/jdepend",
-                                   reportFiles          : 'jdepend.html',
-                                   reportName           : 'JDepend Report'] )
-    }
     if ( analysis )
     {
       script.step( [$class: 'AnalysisPublisher', unstableTotalAll: '1', failedTotalAll: '1'] )
