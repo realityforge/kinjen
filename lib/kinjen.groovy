@@ -197,6 +197,7 @@ static zim_stage( script, name, dependencies )
     script.build job: 'zim/upgrade_dependency',
                  parameters: [script.string( name: 'DEPENDENCIES', value: dependencies ),
                               script.string( name: 'NAME', value: name ),
+                              script.string( name: 'BRANCH_KEY', value: 'upgrade_dependencies' ),
                               script.string( name: 'VERSION', value: "${script.env.PRODUCT_VERSION}" )],
                  wait: false
   }
