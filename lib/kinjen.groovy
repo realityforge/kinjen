@@ -229,9 +229,9 @@ static deploy_stage( script, project_key, deployment_environment = 'development'
 
 def static kill_previous_builds( script )
 {
-  while ( script.rawBuild.getPreviousBuildInProgress() != null )
+  while ( script.currentBuild.getPreviousBuildInProgress() != null )
   {
-    script.rawBuild.getPreviousBuildInProgress().doKill()
+    script.currentBuild.getPreviousBuildInProgress().doKill()
   }
 }
 
