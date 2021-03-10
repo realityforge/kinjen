@@ -233,18 +233,15 @@ static deploy_stage( script, project_key, deployment_environment = 'development'
 
 def static kill_previous_builds( script )
 {
-  Run previousBuild = script.currentBuild.rawBuild.getPreviousBuildInProgress()
+  def previousBuild = script.currentBuild.previousBuildInProgress
 
   while (previousBuild != null) {
-    if (previousBuild.isInProgress()) {
-      def executor = previousBuild.getExecutor()
-      if (executor != null) {
-        echo ">> Aborting older build #${previousBuild.number}"
-        executor.interrupt(Result.ABORTED, new CauseOfInterruptionUserInterruption("Aborted by newer build #${script.currentBuild.number}"))
-      }
+    def executor = previousBuild.rawBuild.getExecutor()
+    if (null != executor) {
+      script.echo ">> Aborting older build #${previousBuild.number}"
+      executor.interrupt(Result.ABORTED, new UserInterruption("Aborted by newer build #${script.currentBuild.number}"))
     }
-
-    previousBuild = previousBuild.getPreviousBuildInProgress()
+    previousBuild = previousBuild.previousBuildInProgress
   }
 }
 
