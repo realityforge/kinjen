@@ -391,7 +391,6 @@ static prepare_auto_merge( script, target_branch )
     script.sh( script: "git show-ref --hash refs/remotes/origin/${target_branch}", returnStdout: true ).trim()
   script.echo "Automerge branch ${script.env.BRANCH_NAME} detected. Merging ${target_branch} into local branch."
   script.sh( "git merge origin/${target_branch}" )
-  kill_previous_builds( script );
 }
 
 static complete_auto_merge( script, target_branch, Map options = [:] )
