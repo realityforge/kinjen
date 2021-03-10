@@ -1,3 +1,7 @@
+import hudson.model.Result
+import hudson.model.Run
+import jenkins.model.CauseOfInterruption.UserInterruption
+
 /**
  * Return the branch name that this branch will automatically merge into if any. Return null if branch is not an auotmerge branch.
  */
@@ -229,9 +233,18 @@ static deploy_stage( script, project_key, deployment_environment = 'development'
 
 def static kill_previous_builds( script )
 {
-  while ( script.currentBuild.getPreviousBuildInProgress() != null )
-  {
-    script.currentBuild.getPreviousBuildInProgress().doKill()
+  Run previousBuild = script.currentBuild.rawBuild.getPreviousBuildInProgress()
+
+  while (previousBuild != null) {
+    if (previousBuild.isInProgress()) {
+      def executor = previousBuild.getExecutor()
+      if (executor != null) {
+        echo ">> Aborting older build #${previousBuild.number}"
+        executor.interrupt(Result.ABORTED, new CauseOfInterruptionUserInterruption("Aborted by newer build #${script.currentBuild.number}"))
+      }
+    }
+
+    previousBuild = previousBuild.getPreviousBuildInProgress()
   }
 }
 
