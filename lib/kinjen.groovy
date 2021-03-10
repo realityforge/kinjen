@@ -228,17 +228,23 @@ static deploy_stage( script, project_key, deployment_environment = 'development'
 }
 
 @NonCPS
-def static cancel_queued_deploys( script, project_key, deployment_environment = 'development' )
+def static cancel_queued_job( script, job_name )
 {
   def q = Jenkins.instance.queue
   for ( def i = q.items.size() - 1; i >= 0; i-- )
   {
-    if ( q.items[ i ].task.getOwnerTask().getFullName() == "${project_key}/deploy-to-${deployment_environment}" )
+    if ( q.items[ i ].task.getOwnerTask().getFullName() == job_name )
     {
-      script.echo "Cancelling queued deploy job ${q.items[ i ].task.getOwnerTask().getFullName()}"
+      script.echo "Cancelling queued job ${q.items[ i ].task.getOwnerTask().getFullName()}"
       q.cancel( q.items[ i ].task )
     }
   }
+}
+
+@NonCPS
+def static cancel_queued_deploys( script, project_key, deployment_environment = 'development' )
+{
+  cancel_queued_job( script, "${project_key}/deploy-to-${deployment_environment}" )
 }
 
 @NonCPS
