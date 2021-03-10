@@ -410,7 +410,7 @@ static complete_auto_merge( script, target_branch, Map options = [:] )
       else
       {
         /*
-         * The target branch has been updated but current branch was includes the changes in the target
+         * The target branch has been updated but current branch includes the changes in the target
          * branch. This can occur if branch A was merged into the target branch but the current branch was
          * branched off branch A. In this case it is safe to merge it into master.
          */
