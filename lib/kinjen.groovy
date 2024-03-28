@@ -1,5 +1,5 @@
+//file:noinspection unused
 import hudson.model.Result
-import hudson.model.Run
 import jenkins.model.CauseOfInterruption.UserInterruption
 
 /**
@@ -176,8 +176,25 @@ static pg_package_stage( script )
  */
 static import_stage( script )
 {
-  script.stage( 'DB Import' ) {
-    script.sh 'xvfb-run -a bundle exec buildr ci:import'
+  /*
+    Future: Only run import if there are db changes since the last time import successfully ran
+    Now: Only run import if there are db changes on this branch (compared to master)
+  */
+
+  // Future: find last commit with successful import
+  // Now: just fall back on the master branch
+  def compare = 'origin/master'
+
+  // find changes in db directory since target commit
+  def changes = script.sh(script: "git diff --name-only ${compare} database", returnStdout: true).trim()
+  if ( changes ) {
+    script.echo 'Db import stage is necessary due to changes in the database directory'
+    script.echo changes
+    script.stage( 'DB Import' ) {
+      script.sh 'xvfb-run -a bundle exec buildr ci:import'
+    }
+  } else {
+    script.echo 'Skipping db import stage, no changes in database directory'
   }
 }
 
@@ -312,11 +329,12 @@ static do_guard_build( script, Map options = [:], actions )
   def always_run = options.always_run == null ? false : options.always_run
   def err = null
 
-  if ( !always_run && is_github_status_success( script, 'downstream_updated' ) )
+  if ( !always_run && script.env.BRANCH_NAME == 'master' )
   {
-    script.echo 'Build already occurred (on automerge branch?). Marking build as successful and terminating build.'
+    script.echo 'Build is on master.  Marking build as successful and terminating build.'
     script.currentBuild.result = 'SUCCESS'
     script.env.SKIP_DOWNSTREAM = 'true'
+    set_github_status( script, 'success', 'Build skipped on master', [build_context: build_context] )
     send_notifications( script )
     return
   }
