@@ -316,15 +316,40 @@ static is_github_status_success( script, build_context, Map options = [:] )
   present.equals( 'true' )
 }
 
+/**
+ * Return the commit hash for the commit from the branch that was just merged into the current head.
+ * Note this is chronological.  When using this to get the last commit on a branch that has now merged into
+ * master it is assumed that master can not have had any other commits that are not included in the branch.
+ * Returns nothing if the current commit is not a merge commit
+ */
+static get_pre_merge_commit_hash( script )
+{
+  script.sh( script: "git log --format='%P' -n 1 | awk '{print \$2}'", returnStdout: true ).trim()
+}
+
+/**
+ * Return the description of the 'success' status, from the given commit.
+ * As it uses the installed octokit it can only be run after the initial prepare phase.
+ */
+static get_success_status_description_for_commit( script, Map options = [:] )
+{
+  def build_context = options.build_context == null ? 'jenkins' : options.build_context
+  def git_commit = options.git_commit == null ? script.env.GIT_COMMIT : options.git_commit
+  def git_project = options.git_project == null ? script.env.GIT_PROJECT : options.git_project
+
+  script.sh(
+    script: "ruby -e \"require 'octokit';puts (Octokit::Client.new(:netrc => true).statuses('${git_project}', '${git_commit}').find{|s| s[:state] == 'success' && s[:context] == '${build_context}'} || [])['description']\"",
+    returnStdout: true ).trim()
+}
+
 static complete_downstream_actions( script )
 {
-  set_github_status( script, 'success', 'Downstream actions completed', [build_context: 'downstream_updated'] )
+  set_github_status( script, 'success', "Downstream actions completed: ${script.env.PRODUCT_VERSION}", [build_context: 'downstream_updated'] )
 }
 
 static do_guard_build( script, Map options = [:], actions )
 {
   def notify_github = options.notify_github == null ? true : options.notify_github
-  def build_context = options.build_context == null ? 'jenkins' : options.build_context
   def email = options.email == null ? true : options.email
   def always_run = options.always_run == null ? false : options.always_run
   def err = null
@@ -338,18 +363,33 @@ static do_guard_build( script, Map options = [:], actions )
     send_notifications( script )
     return
   } else if ( !always_run && build_is_master ) {
-    script.echo 'Build is on master.  Marking build as successful and terminating build.'
-    script.currentBuild.result = 'SUCCESS'
-    set_github_status( script, 'success', 'Build skipped on master', [build_context: build_context] )
-    send_notifications( script )
-    return
+    def git_commit = get_pre_merge_commit_hash( script )
+    if ( git_commit ) {
+      script.echo "Build is on merge branch. Pre-merge commit was ${git_commit}"
+      def previous_status = get_success_status_description_for_commit( script, [git_commit: git_commit] )
+      if ( previous_status ) {
+        if (previous_status.startsWith("Successfully built: ")) {
+          def previous_build = previous_status.replace("Successfully built: ", "")
+          script.env.PRODUCT_VERSION = previous_build
+          script.echo "Build is following a successful merge.  Marking build as successful and terminating build. Previous build was ${script.env.PRODUCT_VERSION} for commit ${git_commit}"
+          script.currentBuild.result = 'SUCCESS'
+          set_github_status( script, 'success', "Build skipped, using artifact: ${script.env.PRODUCT_VERSION}" )
+          send_notifications( script )
+          return
+        } else {
+          script.echo "No build artifact defined in status \"${previous_status}\", triggering build"
+        }
+      } else {
+        script.echo "No successful build on merge branch, triggering build"
+      }
+    }
   }
   try
   {
     script.currentBuild.result = 'SUCCESS'
     if ( notify_github )
     {
-      set_github_status( script, 'pending', 'Building in jenkins', [build_context: build_context] )
+      set_github_status( script, 'pending', "Building in jenkins: ${script.env.PRODUCT_VERSION}" )
     }
 
     actions()
@@ -365,11 +405,11 @@ static do_guard_build( script, Map options = [:], actions )
     {
       if ( script.currentBuild.result == 'SUCCESS' )
       {
-        set_github_status( script, 'success', 'Successfully built', [build_context: build_context] )
+        set_github_status( script, 'success', "Successfully built: ${script.env.PRODUCT_VERSION}" )
       }
       else
       {
-        set_github_status( script, 'failure', 'Failed to build', [build_context: build_context] )
+        set_github_status( script, 'failure', "Failed to build: ${script.env.PRODUCT_VERSION}" )
       }
     }
 
@@ -415,10 +455,8 @@ static prepare_auto_merge( script, target_branch )
   script.sh( "git merge origin/${target_branch}" )
 }
 
-static complete_auto_merge( script, target_branch, Map options = [:] )
+static complete_auto_merge( script, target_branch )
 {
-  def build_context = options.build_context == null ? 'jenkins' : options.build_context
-
   script.sh( 'git fetch --prune' )
   script.env.LATEST_REMOTE_MASTER_GIT_COMMIT =
     script.sh( script: "git show-ref --hash refs/remotes/origin/${target_branch}", returnStdout: true ).trim()
@@ -444,17 +482,17 @@ static complete_auto_merge( script, target_branch, Map options = [:] )
          * branch. This can occur if branch A was merged into the target branch but the current branch was
          * branched off branch A. In this case it is safe to merge it into master.
          */
-        perform_auto_merge( script, target_branch, build_context )
+        perform_auto_merge( script, target_branch )
       }
     }
   }
   else if ( script.env.GIT_COMMIT == script.env.LATEST_REMOTE_GIT_COMMIT )
   {
-    perform_auto_merge( script, target_branch, build_context )
+    perform_auto_merge( script, target_branch )
   }
 }
 
-static perform_auto_merge( script, target_branch, build_context )
+static perform_auto_merge( script, target_branch )
 {
   script.echo "Merging automerge branch ${script.env.BRANCH_NAME}."
   def git_commit = script.sh( script: 'git rev-parse HEAD', returnStdout: true ).trim()
@@ -463,8 +501,8 @@ static perform_auto_merge( script, target_branch, build_context )
     script.sh( "git push origin HEAD:${script.env.BRANCH_NAME}" )
     set_github_status( script,
                        'success',
-                       'Successfully built',
-                       [build_context: build_context, git_commit: git_commit] )
+                       "Successfully built: ${script.env.PRODUCT_VERSION}",
+                       [git_commit: git_commit] )
   }
   script.sh( "git push origin HEAD:${target_branch}" )
   /*
