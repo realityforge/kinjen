@@ -173,28 +173,59 @@ static pg_package_stage( script )
 
 /**
  * The basic database import task.
+ * Does nothing if there has been no change in the database directory since the last successful build.
+ * We only go back 25 commits when looking for a successful build.
+ * If a successful build can not be found for the past 25 commits (or back until a commit was part of master)
+ * then a comparison is done against master to determine if this stage should run.
  */
 static import_stage( script )
 {
-  /*
-    Future: Only run import if there are db changes since the last time import successfully ran
-    Now: Only run import if there are db changes on this branch (compared to master)
-  */
-
-  // Future: find last commit with successful import
-  // Now: just fall back on the master branch
-  def compare = 'origin/master'
-
-  // find changes in db directory since target commit
-  def changes = script.sh(script: "git diff --name-only ${compare} database", returnStdout: true).trim()
+  // find changes in db directory compared to master
+  def changes = script.sh(script: "git diff --name-only origin/master database", returnStdout: true).trim()
   if ( changes ) {
-    script.echo 'Db import stage is necessary due to changes in the database directory'
+    script.echo 'There are changes in the database directory, compared to master'
     script.echo changes
-    script.stage( 'DB Import' ) {
-      script.sh 'xvfb-run -a bundle exec buildr ci:import'
+
+    // Is there a successful build we can use instead
+    def build_required = true
+    def stop_looking = false
+    def previous_commits = script.sh(script: "git rev-list HEAD~25..HEAD~1", returnStdout: true).trim().split()
+    previous_commits.each { git_commit ->
+      if ( !stop_looking ) {
+        def previous_status = get_success_status_description_for_commit( script, [git_commit: git_commit] )
+        if ( previous_status ) {
+          script.echo "Found historically successful build for ${git_commit}"
+          stop_looking = true
+          if ( script.sh(script: "git diff --name-only ${git_commit} database", returnStdout: true).trim() ) {
+            script.echo "Changes exist since successful build for ${git_commit}"
+            build_required = true
+          } else {
+            script.echo "No changes exist since successful build for ${git_commit}"
+            build_required = false
+          }
+        } else {
+          script.echo "No successful build for ${git_commit}"
+          if ( script.sh(script: "git branch --contains ${git_commit}", returnStdout: true).trim().contains("master") ){
+            script.echo "Reached master branch without a successful build: ${git_commit}"
+            build_required = true
+            stop_looking = true
+          } else {
+            script.echo "Commit is not on master, continuing to check history: ${git_commit}"
+          }
+        }
+      }
+    }
+
+    if (build_required) {
+      script.echo 'Running DB Import as no historically successful build could be found with no subsequent changes'
+      script.stage( 'DB Import' ) {
+        script.sh 'xvfb-run -a bundle exec buildr ci:import'
+      }
+    } else {
+      script.echo 'Skipping db import stage'
     }
   } else {
-    script.echo 'Skipping db import stage, no changes in database directory'
+    script.echo 'Skipping db import stage, no changes in database directory compared to master'
   }
 }
 
@@ -338,7 +369,7 @@ static get_success_status_description_for_commit( script, Map options = [:] )
   def git_project = options.git_project == null ? script.env.GIT_PROJECT : options.git_project
 
   script.sh(
-    script: "ruby -e \"require 'octokit';puts (Octokit::Client.new(:netrc => true).statuses('${git_project}', '${git_commit}').find{|s| s[:state] == 'success' && s[:context] == '${build_context}'} || [])['description']\"",
+    script: "ruby -e \"require 'octokit';x=(Octokit::Client.new(:netrc => true).statuses('${git_project}', '${git_commit}').find{|s| s[:state] == 'success' && s[:context] == '${build_context}'}); x.respond_to?('description') ? puts(x['description']) : nil\"",
     returnStdout: true ).trim()
 }
 
