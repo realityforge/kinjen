@@ -335,8 +335,9 @@ static set_github_status( script, state, message, Map options = [:] )
  * Return true if status for specified context is successful.
  * As it uses the installed octokit it can only be run after the initial prepare phase.
  */
-static is_github_status_success( script, build_context, Map options = [:] )
+static is_github_status_success( script, Map options = [:] )
 {
+  def build_context = options.build_context == null ? 'jenkins' : options.build_context
   def git_commit = options.git_commit == null ? script.env.GIT_COMMIT : options.git_commit
   def git_project = options.git_project == null ? script.env.GIT_PROJECT : options.git_project
 
@@ -359,6 +360,23 @@ static get_pre_merge_commit_hash( script )
 }
 
 /**
+ * Return true of the given commit had any changes
+ */
+static git_commit_has_changes( script, Map options = [:]  )
+{
+  def git_commit = options.git_commit == null ? script.env.GIT_COMMIT : options.git_commit
+  return script.sh( script: "git show ${git_commit}", returnStdout: true ).contains('diff --git')
+}
+
+/*
+ * Return hashes of all parents for a given commit
+ */
+static git_parent_commit_hashes(script, Map options = [:]) {
+  def git_commit = options.git_commit == null ? script.env.GIT_COMMIT : options.git_commit
+  return script.sh( script: "git log --pretty=%P -n 1 ${git_commit}", returnStdout: true ).trim().split()
+}
+
+/**
  * Return the description of the 'success' status, from the given commit.
  * As it uses the installed octokit it can only be run after the initial prepare phase.
  */
@@ -378,6 +396,13 @@ static complete_downstream_actions( script )
   set_github_status( script, 'success', "Downstream actions completed: ${script.env.PRODUCT_VERSION}", [build_context: 'downstream_updated'] )
 }
 
+static get_artifact_from_previous_status( previous_status ) {
+  if (previous_status.startsWith("Successfully built: ") || previous_status.startsWith("Build skipped, using artifact: ")) {
+    return previous_status.replace( "Successfully built: ", "" ).replace( "Build skipped, using artifact: ", "" )
+  }
+  return null
+}
+
 static do_guard_build( script, Map options = [:], actions )
 {
   def notify_github = options.notify_github == null ? true : options.notify_github
@@ -385,33 +410,72 @@ static do_guard_build( script, Map options = [:], actions )
   def always_run = options.always_run == null ? false : options.always_run
   def err = null
 
-  def build_is_master = script.env.BRANCH_NAME == 'master'
-  def build_is_automerge = is_github_status_success( script, 'downstream_updated' )
-  if ( !always_run && build_is_automerge ) {
-    script.echo 'Build already occurred (on automerge branch?). Marking build as successful and terminating build.'
-    script.currentBuild.result = 'SUCCESS'
-    script.env.SKIP_DOWNSTREAM = 'true'
-    send_notifications( script )
-    return
-  } else if ( !always_run && build_is_master ) {
-    def git_commit = get_pre_merge_commit_hash( script )
-    if ( git_commit ) {
-      script.echo "Build is on merge branch. Pre-merge commit was ${git_commit}"
+  def git_commit = options.git_commit == null ? script.env.GIT_COMMIT : options.git_commit
+  if ( !always_run ) {
+    def build_is_automerge = is_github_status_success( script, ['build_context': 'downstream_updated'] )
+    if ( build_is_automerge ) {
+      script.echo 'Build already occurred on downstream automerge branch'
       def previous_status = get_success_status_description_for_commit( script, [git_commit: git_commit] )
-      if ( previous_status ) {
-        if (previous_status.startsWith("Successfully built: ")) {
-          def previous_build = previous_status.replace("Successfully built: ", "")
-          script.env.PRODUCT_VERSION = previous_build
-          script.echo "Build is following a successful merge.  Marking build as successful and terminating build. Previous build was ${script.env.PRODUCT_VERSION} for commit ${git_commit}"
+      def previous_artifact = get_artifact_from_previous_status(previous_status)
+      if ( previous_artifact ) {
+        script.echo "Previous build artifact was ${previous_artifact}, skipping build"
+        script.env.PRODUCT_VERSION = previous_artifact
+        script.currentBuild.result = 'SUCCESS'
+        script.env.SKIP_DOWNSTREAM = 'true'
+        send_notifications( script )
+        return
+      } else {
+        script.echo "Unable to determine previous build artifact from `${previous_status}`"
+      }
+    } else {
+      // No need to build if this has already built
+      def previous_build_hash = ""
+      def already_built = is_github_status_success( script, [git_commit: git_commit] )
+      if ( already_built ) {
+        script.echo "Commit is already marked as successfully built"
+        previous_build_hash = git_commit
+      } else {
+        // No need to build if all parent branches were built successfully and there are no changes
+        if ( git_commit_has_changes( script ) ) {
+          script.echo "Commit has changes, triggering build"
+        } else {
+          def parent_hashes = git_parent_commit_hashes( script )
+          def all_parent_status_are_success = parent_hashes.every { parent_hash ->
+            get_success_status_description_for_commit( script, [git_commit: parent_hash] )
+          }
+
+          if ( parent_hashes.size() > 1 )  {
+            script.echo "Build is a merge commit, where all previous branches build successfully"
+            if ( all_parent_status_are_success ) {
+              script.echo "Build is a merge commit, where all parent branches were successfully built"
+              previous_build_hash = get_pre_merge_commit_hash( script )
+            } else {
+              script.echo "Build is a merge commit, but some parents have not successfully built, triggering build"
+            }
+          } else {
+            if ( all_parent_status_are_success ) {
+              script.echo "Build is not a merge commit, but the only parent ${parent_hashes[ 0 ]} was a success"
+              previous_build_hash = parent_hashes[ 0 ]
+            } else {
+              script
+                .echo "Build is not a merge branch, the only parent ${parent_hashes[ 0 ]} did not build successfully, triggering build"
+            }
+          }
+        }
+      }
+      if ( previous_build_hash ) {
+        def previous_status = get_success_status_description_for_commit( script, [git_commit: previous_build_hash] )
+        def previous_artifact = get_artifact_from_previous_status(previous_status)
+        if ( previous_artifact ) {
+          script.env.PRODUCT_VERSION = previous_artifact
+          script.echo "Previous successful build artifact was ${script.env.PRODUCT_VERSION} for commit ${previous_build_hash}"
           script.currentBuild.result = 'SUCCESS'
           set_github_status( script, 'success', "Build skipped, using artifact: ${script.env.PRODUCT_VERSION}" )
           send_notifications( script )
           return
         } else {
-          script.echo "No build artifact defined in status \"${previous_status}\", triggering build"
+          script.echo "No build artifact defined in status \"${previous_status}\" on commit ${previous_build_hash}, triggering build"
         }
-      } else {
-        script.echo "No successful build on merge branch, triggering build"
       }
     }
   }
