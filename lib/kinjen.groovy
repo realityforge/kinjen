@@ -23,8 +23,10 @@ static extract_auto_merge_target( script )
 
 /**
  * The standard prepare stage that cleans up repository and downloads/installs java/ruby dependencies.
+ *
+ * This stage will also abort the build if the project only builds commits which have an associated pull request.
  */
-static prepare_stage( script, Map options = [:] )
+static prepare_stage( script, project_key, Map options = [:] )
 {
   script.stage( 'Prepare' ) {
     script.sh 'git reset --hard'
@@ -33,6 +35,7 @@ static prepare_stage( script, Map options = [:] )
     {
       script.sh 'git clean -ffdx'
     }
+
     def versions_envs = options.versions_envs == null ? true : options.versions_envs
     if ( versions_envs )
     {
@@ -53,6 +56,24 @@ static prepare_stage( script, Map options = [:] )
     {
       script.sh 'echo "gem: --no-ri --no-rdoc" > ~/.gemrc'
       script.retry( 2 ) { script.sh 'gem install octokit -v 4.6.2' }
+
+      def require_pr = options.require_pull_request == null ? false : options.require_pull_request
+      if ( script.env.BRANCH_NAME != 'master' && require_pr )
+      {
+        def isTriggeredByUser = script.currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause').size()
+        if ( !isTriggeredByUser )
+        {
+          script.echo "Checking to ensure commit ${script.env.GIT_SHORT_HASH} is included in a PR before continuing"
+          def has_pr = has_github_open_pullrequest(script, project_key, script.env.GIT_SHORT_HASH)
+          if (!has_pr)
+          {
+            script.error( "Not building as no pull requests exist for commit ${script.env.GIT_SHORT_HASH}" )
+          }
+        } else {
+          script.echo "Build was triggered by a user, so proceeding without checking for a PR"
+        }
+      }
+
       script.retry( 2 ) { script.sh 'gem install netrc -v 0.11.0' }
       script.retry( 2 ) { script.sh 'bundle install; rbenv rehash' }
       def include_buildr = options.buildr == null ? true : options.buildr
@@ -329,6 +350,19 @@ static set_github_status( script, state, message, Map options = [:] )
 
   script.
     sh "ruby -e \"require 'octokit';Octokit::Client.new(:netrc => true).create_status('${git_project}', '${git_commit}', '${state}', :context => '${build_context}', :description => '${message}', :target_url => '${target_url}')\""
+}
+
+/**
+ * Return true if there is an open, non-draft, pull request that includes the commit.
+ * As it uses the installed octokit it can only be run after the initial prepare phase.
+ */
+static has_github_open_pullrequest( script, git_project, git_commit )
+{
+  def present = script.sh(
+    script: "ruby -e \"require 'octokit';puts Octokit::Client.new(:netrc => true).get('/repos/stocksoftware/${git_project}/commits/${git_commit}/pulls').any?{|pr| pr[:state] != 'closed' && !pr[:draft]}\"",
+    returnStdout: true ).trim()
+
+  present.equals( 'true' )
 }
 
 /**
