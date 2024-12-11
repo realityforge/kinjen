@@ -58,7 +58,7 @@ static prepare_stage( script, project_key, Map options = [:] )
       script.retry( 2 ) { script.sh 'gem install octokit -v 4.6.2' }
 
       def require_pr = options.require_pull_request == null ? false : options.require_pull_request
-      if ( script.env.BRANCH_NAME != 'master' && require_pr )
+      if ( script.env.BRANCH_NAME != 'master' && '' == script.env.AUTO_MERGE_TARGET_BRANCH && require_pr )
       {
         def isTriggeredByUser = script.currentBuild.getBuildCauses('hudson.model.Cause$UserIdCause').size()
         if ( !isTriggeredByUser )
