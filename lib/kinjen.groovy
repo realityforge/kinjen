@@ -383,17 +383,6 @@ static is_github_status_success( script, Map options = [:] )
 }
 
 /**
- * Return the commit hash for the commit from the branch that was just merged into the current head.
- * Note this is chronological.  When using this to get the last commit on a branch that has now merged into
- * master it is assumed that master can not have had any other commits that are not included in the branch.
- * Returns nothing if the current commit is not a merge commit
- */
-static get_pre_merge_commit_hash( script )
-{
-  script.sh( script: "git log --format='%P' -n 1 | awk '{print \$2}'", returnStdout: true ).trim()
-}
-
-/**
  * Return true of the given commit had any changes
  */
 static git_commit_has_changes( script, Map options = [:]  )
@@ -474,20 +463,29 @@ static do_guard_build( script, Map options = [:], actions )
           script.echo "Commit has changes, triggering build"
         } else {
           def parent_hashes = git_parent_commit_hashes( script )
-          def all_parent_status_are_success = parent_hashes.every { parent_hash ->
-            get_success_status_description_for_commit( script, [git_commit: parent_hash] )
-          }
 
           if ( parent_hashes.size() > 1 )  {
-            script.echo "Build is a merge commit, where all previous branches build successfully"
-            if ( all_parent_status_are_success ) {
-              script.echo "Build is a merge commit, where all parent branches were successfully built"
-              previous_build_hash = get_pre_merge_commit_hash( script )
-            } else {
-              script.echo "Build is a merge commit, but some parents have not successfully built, triggering build"
-            }
+              script.echo "Build is a merge commit"
+              // Determine if there is a single parent with no changes which was a successful build, use it if so.
+              def parents_with_no_changes = []
+              parent_hashes.each  { parent_hash ->
+                if ( script.sh(script: "git diff --name-only ${parent_hash}..${git_commit}", returnStdout: true).trim().isEmpty() ) {
+                  parents_with_no_changes.add(parent_hash)
+                }
+              }
+              if ( parents_with_no_changes.size() == 1 ) {
+                script.echo "Parent ${parents_with_no_changes[ 0 ]} contains all changes, checking if it was a successful build"
+                if ( get_success_status_description_for_commit( script, [git_commit: parents_with_no_changes[0]] ) ) {
+                  script.echo "Parent ${parents_with_no_changes[ 0 ]} was a successful build, using it"
+                  previous_build_hash = parents_with_no_changes[ 0 ]
+                } else {
+                  script.echo "Parent ${parents_with_no_changes[ 0 ]} was not a successful build, triggering build"
+                }
+              } else {
+                script.echo "Unable to find a suitable parent, triggering build.  Number of parents with 0 changes: ${parents_with_no_changes.size()}"
+              }
           } else {
-            if ( all_parent_status_are_success ) {
+            if ( get_success_status_description_for_commit( script, [git_commit: parent_hashes[0]] ) ) {
               script.echo "Build is not a merge commit, but the only parent ${parent_hashes[ 0 ]} was a success"
               previous_build_hash = parent_hashes[ 0 ]
             } else {
