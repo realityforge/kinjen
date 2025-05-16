@@ -193,13 +193,13 @@ static pg_package_stage( script )
 }
 
 /**
- * The basic database import task.
+ * Guard a set of import actions.
  * Does nothing if there has been no change in the database directory since the last successful build.
  * We only go back 25 commits when looking for a successful build.
  * If a successful build can not be found for the past 25 commits (or back until a commit was part of master)
- * then a comparison is done against master to determine if this stage should run.
+ * then a comparison is done against master to determine if the actions should run.
  */
-static import_stage( script )
+static guard_import_stage( script, actions )
 {
   // find changes in db directory compared to master
   def changes = script.sh(script: "git diff --name-only origin/master database", returnStdout: true).trim()
@@ -239,15 +239,24 @@ static import_stage( script )
 
     if (build_required) {
       script.echo 'Running DB Import as no historically successful build could be found with no subsequent changes'
-      script.stage( 'DB Import' ) {
-        script.sh 'xvfb-run -a bundle exec buildr ci:import'
-      }
+      actions()
     } else {
       script.echo 'Skipping db import stage'
     }
   } else {
     script.echo 'Skipping db import stage, no changes in database directory compared to master'
   }
+}
+
+/**
+ * The basic database import task.
+ * Will only run if guard_import_stage allows it to
+ */
+static import_stage( script )
+{
+  guard_import_stage( script, { actions ->
+    script.sh 'xvfb-run -a bundle exec buildr ci:import'
+  } )
 }
 
 /**
