@@ -217,7 +217,7 @@ static guard_import_stage( script, actions )
         if ( previous_status ) {
           script.echo "Found historically successful build for ${git_commit}"
           stop_looking = true
-          if ( script.sh(script: "git diff --name-only ${git_commit} database", returnStdout: true).trim() ) {
+          if ( script.sh(script: "git diff --name-only ${git_commit} database | grep -v /datasets/", returnStdout: true).trim() ) {
             script.echo "Changes exist since successful build for ${git_commit}"
             build_required = true
           } else {
