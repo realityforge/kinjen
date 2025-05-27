@@ -54,7 +54,7 @@ static prepare_stage( script, project_key, Map options = [:] )
     def include_ruby = options.ruby == null ? true : options.ruby
     if ( include_ruby )
     {
-      script.sh 'echo "gem: --no-ri --no-rdoc" > ~/.gemrc'
+      script.sh 'echo "gem: --no-document --silent" > ~/.gemrc'
       script.retry( 2 ) { script.sh 'gem install octokit -v 4.6.2' }
 
       def require_pr = options.require_pull_request == null ? false : options.require_pull_request
@@ -75,7 +75,7 @@ static prepare_stage( script, project_key, Map options = [:] )
       }
 
       script.retry( 2 ) { script.sh 'gem install netrc -v 0.11.0' }
-      script.retry( 2 ) { script.sh 'bundle install; rbenv rehash' }
+      script.retry( 2 ) { script.sh 'bundle install --quiet; rbenv rehash' }
       def include_buildr = options.buildr == null ? true : options.buildr
       if ( include_buildr )
       {
