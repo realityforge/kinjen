@@ -269,22 +269,6 @@ static import_variant_stage( script, variant )
   }
 }
 
-/**
- * A task that triggers the zimming out of dependencies to downstream projects.
- */
-static zim_stage( script, name, dependencies )
-{
-  script.stage( 'Zim' ) {
-    cancel_queued_zims( script, name )
-    script.build job: 'zim/upgrade_dependency',
-                 parameters: [script.string( name: 'DEPENDENCIES', value: dependencies ),
-                              script.string( name: 'NAME', value: name ),
-                              script.string( name: 'BRANCH_KEY', value: 'upgrade_dependencies' ),
-                              script.string( name: 'VERSION', value: "${script.env.PRODUCT_VERSION}" )],
-                 wait: false
-  }
-}
-
 static deploy_stage( script, project_key, deployment_environment = 'development' )
 {
   script.stage( 'Deploy' ) {
@@ -329,21 +313,6 @@ def static cancel_queued_job( script, job_name )
 def static cancel_queued_deploys( script, project_key, deployment_environment = 'development' )
 {
   cancel_queued_job( script, "${project_key}/deploy-to-${deployment_environment}" )
-}
-
-@NonCPS
-def static cancel_queued_zims( script, name )
-{
-  def q = Jenkins.instance.queue
-  for ( def i = q.items.size() - 1; i >= 0; i-- )
-  {
-    if ( q.items[ i ].task.getOwnerTask().getFullName() == "zim/upgrade_dependency" &&
-         ( q.items[ i ].params + "\n" ).contains( "NAME=${name}\n" ) )
-    {
-      script.echo "Cancelling queued zim update job: ${q.items[ i ].params}"
-      q.cancel( q.items[ i ].task )
-    }
-  }
 }
 
 /**
